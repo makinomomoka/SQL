@@ -45,8 +45,37 @@ export default function usersRawRouter(knex) {
     res.json(rows);
   });
 
+  // 検索: GET /users/search
+  // 検索方法(例)：GET /users/search?name_like=ta&from=2024-01-01&to=2025-12-31&domains=gmail.com,yahoo.co.jp
+  r.get('/search', async (req, res) => {
+    const { name_like, from, to, domains } = req.query || {};
+    const conds = [];
+    const params = [];
+
+    if (name_like) { conds.push('name LIKE ?'); params.push(`%${name_like}%`); }
+    if (from && to) { conds.push('created_at BETWEEN ? AND ?'); params.push(from, to); }
+    else if (from) { conds.push('created_at >= ?'); params.push(from); }
+    else if (to) { conds.push('created_at <= ?'); params.push(to); }
+
+    if (domains) {
+      const list = String(domains).split(',').map(s => s.trim()).filter(Boolean);
+      if (list.length) {
+        conds.push(`SUBSTRING_INDEX(email, '@', -1) IN (${list.map(_=>'?').join(',')})`);
+        params.push(...list);
+      }
+    }
+
+    // where には WHERE句が入る
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const [rows] = await knex.raw(
+      // 【後期Day5課題】ここのSQLを考えて書く
+
+    );
+    res.json(rows);
+  });
+
   // 取得: GET /users/:id
-  r.get('/:id', async (req, res) => {
+  r.get('/:id(\\d+)', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
 
@@ -60,7 +89,7 @@ export default function usersRawRouter(knex) {
   });
 
   // 更新: PATCH /users/:id  { name?, email? }
-  r.patch('/:id', async (req, res) => {
+  r.patch('/:id(\\d+)', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
 
@@ -97,7 +126,7 @@ export default function usersRawRouter(knex) {
   });
 
   // 削除: DELETE /users/:id
-  r.delete('/:id', async (req, res) => {
+  r.delete('/:id(\\d+)', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'invalid id' });
 
